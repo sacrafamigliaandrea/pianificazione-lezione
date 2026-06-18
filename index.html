@@ -522,7 +522,7 @@ const PBKDF2_ITER = 210000;
    Quando è impostato, la pagina chiede SEMPRE la tua password e NON mostra mai
    la schermata "Crea password". Il codice è innocuo da pubblicare: senza la
    password non apre nulla (serve solo a verificare che sia la tua).            */
-const OWNER_GATE = {"salt":"kq+MgqsIKhQQ9eqrnXgbOg==","check":"lPDZLvRefo/DHW1CwUUU8eTFtVlGyYYTpxIqMmyCSNX64OrKI6/0MA=="};
+const OWNER_GATE = {"salt":"q3Z+vVBqh4k777OmVPFmtg==","check":"ysEi1n72bw44n9b1WVFYyXkIYfuIBBE4knxZf+WDhyKWVH5bjQmSjw=="};
 const GATE_MARKER = "ACERIO-OWNER";
 
 /* ======================= CRYPTO (AES-256-GCM) ======================= */
@@ -1018,14 +1018,25 @@ $("#lockForm").addEventListener("submit", async e=>{
           err.textContent="Password errata.";return;
         }
         // 2) decifra i dati col salt del BLOB stesso (può differire dal gate)
+        let loaded=false;
         if(env){
-          const parsed=JSON.parse(env);
-          cryptoSalt=unb64(parsed.salt);
-          cryptoKey=await deriveKey(pwd,cryptoSalt);
-          state=Object.assign(defaultState(), await decryptEnvelope(env));
-          localStorage.setItem(BLOB_KEY,env);
-          if(state.theme){meta.theme=state.theme;saveMeta();}
-        } else {
+          try{
+            const parsed=JSON.parse(env);
+            cryptoSalt=unb64(parsed.salt);
+            cryptoKey=await deriveKey(pwd,cryptoSalt);
+            state=Object.assign(defaultState(), await decryptEnvelope(env));
+            localStorage.setItem(BLOB_KEY,env);
+            if(state.theme){meta.theme=state.theme;saveMeta();}
+            loaded=true;
+          }catch(_){
+            // I dati salvati sono cifrati con una password diversa da questa.
+            if(!confirm("Esistono dati salvati cifrati con una password diversa: non possono essere aperti con questa.\n\nVuoi ricominciare da zero con QUESTA password? I dati precedenti verranno sostituiti definitivamente.")){
+              err.textContent="Accesso annullato. Inserisci la password con cui hai cifrato i dati.";
+              cryptoKey=null;cryptoSalt=null;return;
+            }
+          }
+        }
+        if(!loaded){
           cryptoSalt=unb64(OWNER_GATE.salt);
           cryptoKey=await deriveKey(pwd,cryptoSalt);
           state=defaultState();state.theme=meta.theme;await persist();
