@@ -161,6 +161,14 @@ table.timetable{border-collapse:collapse;width:100%;min-width:760px}
 .lesson .l-foot{margin-top:auto;display:flex;align-items:center;gap:6px;font-size:10px;color:var(--faint);font-weight:700}
 .lesson .cat{padding:1px 7px;border-radius:6px;background:rgba(100,116,139,.12);text-transform:uppercase;letter-spacing:.03em}
 .lesson.done{opacity:.85}
+.lesson.suspended{background:repeating-linear-gradient(135deg,rgba(148,163,184,.10),rgba(148,163,184,.10) 7px,rgba(148,163,184,.18) 7px,rgba(148,163,184,.18) 14px);border-color:rgba(148,163,184,.45);border-style:dashed}
+.lesson.suspended .cls{text-decoration:line-through;text-decoration-color:rgba(100,116,139,.6)}
+.lesson.suspended .topic{color:var(--faint);font-style:italic;opacity:.8}
+.lesson .susp-badge{position:absolute;top:6px;right:6px;display:none;align-items:center;gap:3px;font-size:9px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.03em;color:#b45309;background:rgba(217,119,6,.16);padding:2px 6px;border-radius:6px}
+.lesson.suspended .susp-badge{display:inline-flex}
+.lesson.suspended .done-badge{display:none}
+[data-theme=dark] .lesson.suspended .susp-badge{color:#fbbf24;background:rgba(217,119,6,.22)}
 .lesson .done-badge{position:absolute;top:6px;right:6px;width:18px;height:18px;border-radius:50%;
   background:var(--emerald);color:#fff;display:none;place-items:center}
 .lesson.done .done-badge{display:grid}
@@ -252,6 +260,8 @@ table.timetable{border-collapse:collapse;width:100%;min-width:760px}
 .field input,.field textarea,.field select{width:100%;border:1px solid var(--border);background:var(--surface-2);
   color:var(--fg);border-radius:11px;padding:11px 13px;font-family:inherit;font-size:14.5px;resize:vertical}
 .field textarea{min-height:120px;font-family:ui-monospace,Menlo,monospace;font-size:13px}
+#lmNotes{min-height:62px;font-family:inherit;font-size:14px}
+.checkrow.warn input{accent-color:#d97706}
 .field .hint{font-size:11.5px;color:var(--faint);margin-top:5px;line-height:1.4}
 .modal .m-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:center}
 .checkrow{display:flex;align-items:center;gap:10px;background:var(--surface-2);border:1px solid var(--border);
@@ -426,8 +436,9 @@ table.timetable{border-collapse:collapse;width:100%;min-width:760px}
         <div class="pick-list" id="lmPick"></div>
         <div class="hint" id="lmNoTopics" style="display:none">Nessun argomento in catalogo. Vai su <b>Argomenti</b> e importa le tue web app.</div>
       </div>
-      <div class="field"><label>Note</label><input id="lmNotes" type="text" placeholder="Materiali, compiti, da ricordare…" /></div>
+      <div class="field"><label>Note</label><textarea id="lmNotes" rows="2" placeholder="Materiali, compiti, cose da ricordare…"></textarea></div>
       <label class="checkrow"><input type="checkbox" id="lmDone" /> Lezione svolta</label>
+      <label class="checkrow warn"><input type="checkbox" id="lmSuspended" /> Lezione sospesa (festività, assenza, nessuna lezione)</label>
     </div>
     <div class="m-foot"><button class="btn danger sm" id="lmClear">Svuota</button><div class="spacer" style="flex:1"></div>
       <button class="btn sm" id="lmCancel">Annulla</button><button class="btn primary sm" id="lmSave">Salva</button></div>
@@ -512,6 +523,7 @@ const PBKDF2_ITER = 210000;
    la schermata "Crea password". Il codice è innocuo da pubblicare: senza la
    password non apre nulla (serve solo a verificare che sia la tua).            */
 const OWNER_GATE = {"salt":"NRPDcVpUR4fPkxJ7AwDpeA==","check":"EiR1Losfcw7EQm4WqgpYk4rv2eZ0cmCTIWA6fLazRJrKKNqpSnKXY82dAQ=="};
+const GATE_MARKER = {"salt":"NRPDcVpUR4fPkxJ7AwDpeA==","check":"ywPAvQIZQg+AaDm+DMhZ0YEOLVwM9SSWx5hWCLJ8oNo0tn9TxyN9Pg=="};
 
 /* ======================= CRYPTO (AES-256-GCM) ======================= */
 const enc = new TextEncoder(), dec = new TextDecoder();
@@ -650,11 +662,13 @@ function renderWeekHeader(){
   $("#weekDates").textContent=fmtRange(currentWeek);
   $("#weekSelect").value=currentWeek;
   const teachSlots=state.slots.filter(s=>isTeaching(cls(s.classId)));
-  const total=teachSlots.length;
-  const planned=teachSlots.filter(s=>{const l=getLesson(currentWeek,s.id);return l&&l.appId;}).length;
+  const active=teachSlots.filter(s=>{const l=getLesson(currentWeek,s.id);return !(l&&l.suspended);});
+  const susp=teachSlots.length-active.length;
+  const total=active.length;
+  const planned=active.filter(s=>{const l=getLesson(currentWeek,s.id);return l&&l.appId;}).length;
   const pct=total?Math.round(planned/total*100):0;
   $("#weekProgFill").style.width=pct+"%";$("#weekProgPct").textContent=pct+"%";
-  $("#weekProgLabel").textContent=planned+" / "+total+" lezioni pianificate";
+  $("#weekProgLabel").textContent=planned+" / "+total+" lezioni pianificate"+(susp?" · "+susp+" sospes"+(susp===1?"a":"e"):"");
 }
 
 /* ======================= TIMETABLE ======================= */
@@ -682,11 +696,15 @@ function renderTimetable(){
           const a=l&&l.appId?app(l.appId):null;
           const topic=a?a.name:(l&&l.appName?l.appName:"");
           const catLabel=a&&a.cat?a.cat:"";
-          html+="<div class='lesson "+k+(l&&l.done?" done":"")+"' data-slot='"+s.id+"' draggable='false'>"
+          const susp=!!(l&&l.suspended);
+          const noteTag=l&&l.notes?"<span class='l-note' style='margin-left:auto' title='"+esc(l.notes)+"'>note</span>":"";
+          const foot=(!susp&&catLabel)||(l&&l.notes)?("<div class='l-foot'>"+(!susp&&catLabel?"<span class='cat'>"+esc(catLabel)+"</span>":"")+noteTag+"</div>"):"";
+          html+="<div class='lesson "+k+(susp?" suspended":(l&&l.done?" done":""))+"' data-slot='"+s.id+"' draggable='false'>"
             +"<div class='done-badge'><svg viewBox='0 0 24 24' width='11' height='11' fill='none' stroke='#fff' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'><path d='M20 6 9 17l-5-5'/></svg></div>"
+            +"<span class='susp-badge'>Sospesa</span>"
             +"<div class='l-top'><span class='dot "+k+"'></span><span class='cls'>"+esc(c.name)+"</span></div>"
-            +"<div class='topic"+(topic?"":" empty")+"'>"+(topic?esc(topic):"Scegli web app…")+"</div>"
-            +(catLabel||l&&l.notes?("<div class='l-foot'>"+(catLabel?"<span class='cat'>"+esc(catLabel)+"</span>":"")+(l&&l.notes?"<span style='margin-left:auto'>note</span>":"")+"</div>"):"")
+            +(susp?"<div class='topic'>Lezione sospesa</div>":"<div class='topic"+(topic?"":" empty")+"'>"+(topic?esc(topic):"Scegli web app…")+"</div>")
+            +foot
             +"</div>";
           }
         }
@@ -747,7 +765,7 @@ function openLesson(sid){
   lmSelectedApp=l.appId||null;
   $("#lmDot").className="dot "+lv(c);
   $("#lmTitle").textContent=c.name+" · Sett. "+(currentWeek+1);
-  $("#lmNotes").value=l.notes||"";$("#lmDone").checked=!!l.done;
+  $("#lmNotes").value=l.notes||"";$("#lmDone").checked=!!l.done;$("#lmSuspended").checked=!!l.suspended;
   $("#lmSearch").value="";renderPick("");
   $("#lmNoTopics").style.display=state.apps.length?"none":"block";
   openOverlay("#lessonOverlay");setTimeout(()=>$("#lmSearch").focus(),60);
@@ -770,12 +788,15 @@ function renderPick(q){
   if(!items.length&&state.apps.length){const e=document.createElement("div");e.style.cssText="color:var(--faint);font-size:13px;padding:8px";e.textContent="Nessun risultato.";list.appendChild(e);}
 }
 $("#lmSearch").oninput=e=>renderPick(e.target.value);
+$("#lmSuspended").onchange=e=>{if(e.target.checked)$("#lmDone").checked=false;};
+$("#lmDone").onchange=e=>{if(e.target.checked)$("#lmSuspended").checked=false;};
 $("#lmSave").onclick=()=>{
   const k=lessonKey(currentWeek,pendingSlot);
   const a=lmSelectedApp?app(lmSelectedApp):null;
-  const obj={appId:lmSelectedApp||null,appName:a?a.name:"",notes:$("#lmNotes").value.trim(),done:$("#lmDone").checked};
-  if(!obj.appId&&!obj.notes&&!obj.done)delete state.lessons[k];else state.lessons[k]=obj;
-  scheduleSave();closeOverlay("#lessonOverlay");renderWeek();toast("Lezione salvata");
+  const suspended=$("#lmSuspended").checked;
+  const obj={appId:lmSelectedApp||null,appName:a?a.name:"",notes:$("#lmNotes").value.trim(),done:suspended?false:$("#lmDone").checked,suspended:suspended};
+  if(!obj.appId&&!obj.notes&&!obj.done&&!obj.suspended)delete state.lessons[k];else state.lessons[k]=obj;
+  scheduleSave();closeOverlay("#lessonOverlay");renderWeek();toast(suspended?"Lezione sospesa":"Lezione salvata");
 };
 $("#lmClear").onclick=()=>{delete state.lessons[lessonKey(currentWeek,pendingSlot)];scheduleSave();closeOverlay("#lessonOverlay");renderWeek();toast("Lezione svuotata");};
 $("#lmClose").onclick=$("#lmCancel").onclick=()=>closeOverlay("#lessonOverlay");
@@ -879,7 +900,7 @@ $("#impSave").onclick=()=>{
 /* ======================= PROGRESS ======================= */
 function renderProgress(){
   let planned=0,done=0;
-  Object.values(state.lessons).forEach(l=>{if(l.appId)planned++;if(l.done)done++;});
+  Object.values(state.lessons).forEach(l=>{if(l.suspended)return;if(l.appId)planned++;if(l.done)done++;});
   const stats=[
     ["#4f46e5",teachingClasses().length,"Classi",'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>'],
     ["#0d9488",state.apps.length,"Web app",'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>'],
@@ -890,10 +911,10 @@ function renderProgress(){
   let rows="<thead><tr><th>Classe</th><th>Ore/sett.</th><th>Pianificate</th><th>Svolte</th><th style='width:200px'>Avanzamento</th></tr></thead><tbody>";
   teachingClasses().forEach(c=>{const k=lv(c);
     const ids=state.slots.filter(s=>s.classId===c.id).map(s=>s.id);
-    const cap=ids.length*WEEKS;let p=0,d=0;
-    Object.keys(state.lessons).forEach(key=>{const sid=key.split("|")[1];if(ids.includes(sid)){const l=state.lessons[key];if(l.appId)p++;if(l.done)d++;}});
-    const pct=cap?Math.round(p/cap*100):0;const col=k==="pri"?"var(--primaria)":"var(--secondaria)";
-    rows+="<tr><td><span class='pname'><span class='dot "+k+"'></span>"+esc(c.name)+"</span></td><td>"+ids.length+"</td><td>"+p+"</td><td>"+d+"</td>"
+    const cap=ids.length*WEEKS;let p=0,d=0,sus=0;
+    Object.keys(state.lessons).forEach(key=>{const sid=key.split("|")[1];if(ids.includes(sid)){const l=state.lessons[key];if(l.suspended){sus++;return;}if(l.appId)p++;if(l.done)d++;}});
+    const eff=Math.max(0,cap-sus);const pct=eff?Math.round(p/eff*100):0;const col=k==="pri"?"var(--primaria)":"var(--secondaria)";
+    rows+="<tr><td><span class='pname'><span class='dot "+k+"'></span>"+esc(c.name)+"</span></td><td>"+ids.length+(sus?" <span style='color:var(--muted);font-weight:600'>(−"+sus+")</span>":"")+"</td><td>"+p+"</td><td>"+d+"</td>"
       +"<td><div style='display:flex;align-items:center;gap:8px'><div class='mini-bar'><div class='mini-fill' style='width:"+pct+"%;background:"+col+"'></div></div><span style='font-size:12px;color:var(--muted);font-weight:600'>"+pct+"%</span></div></td></tr>";});
   $("#progTable").innerHTML=rows+"</tbody>";
 }
