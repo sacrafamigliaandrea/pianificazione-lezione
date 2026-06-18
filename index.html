@@ -158,8 +158,8 @@ table.timetable{border-collapse:collapse;width:100%;min-width:760px}
 .lesson .topic{font-size:11.5px;color:var(--fg);line-height:1.28;opacity:.95;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .lesson .topic.empty{color:var(--faint);font-style:italic;opacity:.7}
-.lesson .l-foot{margin-top:auto;display:flex;align-items:center;gap:6px;font-size:10px;color:var(--faint);font-weight:700}
-.lesson .cat{padding:1px 7px;border-radius:6px;background:rgba(100,116,139,.12);text-transform:uppercase;letter-spacing:.03em}
+.lesson .l-foot{margin-top:auto;display:flex;align-items:center;gap:6px;font-size:10px;color:var(--faint);font-weight:700;flex-wrap:nowrap}
+.lesson .cat{padding:1px 7px;border-radius:6px;background:rgba(100,116,139,.12);text-transform:uppercase;letter-spacing:.03em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lesson.done{opacity:.85}
 .lesson.suspended{background:repeating-linear-gradient(135deg,rgba(148,163,184,.10),rgba(148,163,184,.10) 7px,rgba(148,163,184,.18) 7px,rgba(148,163,184,.18) 14px);border-color:rgba(148,163,184,.45);border-style:dashed}
 .lesson.suspended .cls{text-decoration:line-through;text-decoration-color:rgba(100,116,139,.6)}
@@ -173,6 +173,18 @@ table.timetable{border-collapse:collapse;width:100%;min-width:760px}
   background:var(--emerald);color:#fff;display:none;place-items:center}
 .lesson.done .done-badge{display:grid}
 .lesson.done .topic{text-decoration:line-through;text-decoration-color:rgba(5,150,105,.5)}
+.lesson .l-acts{display:flex;gap:4px;margin-left:auto;flex:none}
+.lesson .l-act{width:22px;height:22px;flex:none;padding:0;border:1px solid rgba(100,116,139,.34);border-radius:7px;
+  display:grid;place-items:center;cursor:pointer;color:var(--muted);background:var(--surface);transition:all .12s}
+.lesson .l-act:hover{color:var(--fg);border-color:var(--border-strong);transform:translateY(-1px)}
+.lesson .l-act svg{width:12px;height:12px;pointer-events:none}
+.lesson .l-act.on{color:#fff;border-color:transparent;background:#d97706}
+.lesson .l-note-edit{margin-top:5px}
+.lesson .l-note-edit textarea{width:100%;box-sizing:border-box;font-family:inherit;font-size:11px;line-height:1.32;
+  color:var(--fg);background:var(--surface);border:1px solid var(--border-strong);border-radius:7px;padding:5px 6px;resize:none;min-height:40px;outline:none}
+.lesson .l-note-edit textarea:focus{border-color:var(--indigo);box-shadow:0 0 0 2px rgba(79,70,229,.18)}
+.lesson .l-note{padding:1px 7px;border-radius:6px;background:rgba(217,119,6,.14);color:#b45309;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+[data-theme=dark] .lesson .l-note{color:#fbbf24;background:rgba(217,119,6,.20)}
 .slot-empty{height:100%;min-height:70px;border:1.5px dashed var(--border-strong);border-radius:11px;
   display:grid;place-items:center;color:var(--faint);transition:all .14s}
 .slot-empty:hover{border-color:var(--indigo);color:var(--indigo);background:rgba(79,70,229,.05)}
@@ -697,8 +709,13 @@ function renderTimetable(){
           const topic=a?a.name:(l&&l.appName?l.appName:"");
           const catLabel=a&&a.cat?a.cat:"";
           const susp=!!(l&&l.suspended);
-          const noteTag=l&&l.notes?"<span class='l-note' style='margin-left:auto' title='"+esc(l.notes)+"'>note</span>":"";
-          const foot=(!susp&&catLabel)||(l&&l.notes)?("<div class='l-foot'>"+(!susp&&catLabel?"<span class='cat'>"+esc(catLabel)+"</span>":"")+noteTag+"</div>"):"";
+          const noteTag=l&&l.notes?"<span class='l-note' title='"+esc(l.notes)+"'>"+esc(l.notes)+"</span>":"";
+          const acts=editMode?"":("<span class='l-acts'>"
+            +"<button class='l-act"+(l&&l.notes?" on":"")+"' data-act='note' title='Nota'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M12 20h9'/><path d='M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z'/></svg></button>"
+            +"<button class='l-act"+(susp?" on":"")+"' data-act='susp' title='"+(susp?"Riattiva lezione":"Sospendi lezione")+"'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='6' y='4' width='4' height='16' rx='1'/><rect x='14' y='4' width='4' height='16' rx='1'/></svg></button>"
+            +"</span>");
+          const leftFoot=(!susp&&catLabel?"<span class='cat'>"+esc(catLabel)+"</span>":"")+noteTag;
+          const foot=(leftFoot||acts)?("<div class='l-foot'>"+leftFoot+acts+"</div>"):"";
           html+="<div class='lesson "+k+(susp?" suspended":(l&&l.done?" done":""))+"' data-slot='"+s.id+"' draggable='false'>"
             +"<div class='done-badge'><svg viewBox='0 0 24 24' width='11' height='11' fill='none' stroke='#fff' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'><path d='M20 6 9 17l-5-5'/></svg></div>"
             +"<span class='susp-badge'>Sospesa</span>"
@@ -724,6 +741,11 @@ function bindCells(){
   const t=$("#timetable");
   t.querySelectorAll(".lesson").forEach(el=>{
     el.onclick=()=>{const sid=el.dataset.slot; if(editMode)openAssign(slotById(sid)); else if(!el.dataset.imp)openLesson(sid);};
+    el.querySelectorAll(".l-act").forEach(b=>{
+      b.onclick=e=>{e.stopPropagation();const sid=el.dataset.slot;
+        if(b.dataset.act==="susp")toggleSuspend(sid);
+        else if(b.dataset.act==="note")startNoteEdit(sid,el);};
+    });
     el.setAttribute("draggable", editMode?"true":"false");
     if(editMode){
       el.ondragstart=e=>{e.dataTransfer.setData("text/plain",el.dataset.slot);el.classList.add("dragging");};
@@ -757,6 +779,47 @@ $("#editToggle").onclick=()=>{editMode=!editMode;
   $("#editToggleLabel").textContent=editMode?"Fine modifica":"Modifica orario";
   $("#editToggle").classList.toggle("primary",editMode);
   $("#editHint").style.display=editMode?"inline":"none";renderTimetable();};
+
+/* ============ AZIONI RAPIDE SULLA CARD (nota / sospensione) ============ */
+function blankLesson(){return {appId:null,appName:"",notes:"",done:false,suspended:false};}
+function cleanupLesson(k,l){
+  if(!l.appId&&!l.notes&&!l.done&&!l.suspended)delete state.lessons[k];
+  else state.lessons[k]=l;
+}
+function toggleSuspend(sid){
+  const k=lessonKey(currentWeek,sid);
+  const l=Object.assign(blankLesson(),state.lessons[k]||{});
+  l.suspended=!l.suspended;
+  if(l.suspended)l.done=false;
+  cleanupLesson(k,l);
+  scheduleSave();renderWeek();
+  toast(l.suspended?"Lezione sospesa":"Lezione riattivata");
+}
+function startNoteEdit(sid,el){
+  const exist=el.querySelector(".l-note-edit");
+  if(exist){exist.querySelector("textarea").focus();return;}
+  const k=lessonKey(currentWeek,sid);
+  const cur=(state.lessons[k]&&state.lessons[k].notes)||"";
+  // nascondi l'eventuale pill nota mentre si modifica
+  const pill=el.querySelector(".l-note");if(pill)pill.style.display="none";
+  const box=document.createElement("div");
+  box.className="l-note-edit";
+  box.innerHTML="<textarea rows='2' maxlength='400' placeholder='Scrivi una nota… (Invio per salvare)'></textarea>";
+  el.appendChild(box);
+  const ta=box.querySelector("textarea");
+  ta.value=cur;ta.focus();ta.setSelectionRange(cur.length,cur.length);
+  let done=false;
+  const commit=()=>{if(done)return;done=true;
+    const l=Object.assign(blankLesson(),state.lessons[k]||{});
+    l.notes=ta.value.trim();
+    cleanupLesson(k,l);
+    scheduleSave();renderWeek();toast(l.notes?"Nota salvata":"Nota rimossa");};
+  ta.onclick=e=>e.stopPropagation();
+  ta.onkeydown=e=>{e.stopPropagation();
+    if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();commit();}
+    else if(e.key==="Escape"){e.preventDefault();done=true;renderWeek();}};
+  ta.onblur=commit;
+}
 
 /* ======================= LESSON MODAL ======================= */
 function openLesson(sid){
