@@ -1012,16 +1012,24 @@ $("#lockForm").addEventListener("submit", async e=>{
       if(!env) env=localStorage.getItem(BLOB_KEY);
       // ACCESSO ESCLUSIVO: verifica la password contro il gate del proprietario
       if(OWNER_GATE){
-        cryptoSalt=unb64(OWNER_GATE.salt);
-        cryptoKey=await deriveKey(pwd,cryptoSalt);
-        if(!(await verifyOwnerGate(cryptoKey))){
-          err.textContent="Password errata.";cryptoKey=null;cryptoSalt=null;return;
+        // 1) verifica proprietario col salt del gate (solo controllo accesso)
+        const gateKey=await deriveKey(pwd, unb64(OWNER_GATE.salt));
+        if(!(await verifyOwnerGate(gateKey))){
+          err.textContent="Password errata.";return;
         }
+        // 2) decifra i dati col salt del BLOB stesso (può differire dal gate)
         if(env){
+          const parsed=JSON.parse(env);
+          cryptoSalt=unb64(parsed.salt);
+          cryptoKey=await deriveKey(pwd,cryptoSalt);
           state=Object.assign(defaultState(), await decryptEnvelope(env));
           localStorage.setItem(BLOB_KEY,env);
           if(state.theme){meta.theme=state.theme;saveMeta();}
-        } else { state=defaultState();state.theme=meta.theme;await persist(); }
+        } else {
+          cryptoSalt=unb64(OWNER_GATE.salt);
+          cryptoKey=await deriveKey(pwd,cryptoSalt);
+          state=defaultState();state.theme=meta.theme;await persist();
+        }
         enterApp();return;
       }
       if(!env){ // nothing remote and nothing local -> treat as setup
