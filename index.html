@@ -114,16 +114,8 @@ header.topbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background
 .tab .count{font-size:11px;background:rgba(100,116,139,.14);color:var(--muted);padding:1px 7px;border-radius:20px;font-weight:700}
 .tab.active .count{background:rgba(255,255,255,.25);color:#fff}
 
-.weeknav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
-.weekpill{display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--border);
-  border-radius:14px;padding:8px 10px;box-shadow:var(--shadow-sm)}
-.weekpill .wlabel{display:flex;flex-direction:column;line-height:1.15;padding:0 6px;min-width:150px;text-align:center}
-.weekpill .wlabel b{font-family:"Baloo 2";font-size:17px}
-.weekpill .wlabel span{font-size:12px;color:var(--muted)}
-.weekpill select{height:40px;border:1px solid var(--border);background:var(--surface-2);color:var(--fg);
-  border-radius:10px;padding:0 10px;font-family:inherit;font-size:14px;font-weight:600}
-.wn-meta{font-size:13px;color:var(--muted);font-weight:600}
-.weeknav .spacer{flex:1}
+.edit-hint{background:rgba(79,70,229,.08);border:1px solid rgba(79,70,229,.25);color:var(--indigo);
+  border-radius:11px;padding:8px 13px;font-size:13px;font-weight:600;margin-bottom:12px}
 
 /* ---------- Timetable ---------- */
 .grid-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
@@ -148,19 +140,21 @@ table.timetable{border-collapse:collapse;width:100%;min-width:760px}
 .timetable thead th .dh-num{font-family:"Baloo 2";font-size:16px;font-weight:800;color:var(--indigo)}
 .timetable thead th .dh-mon{font-family:"Inter",sans-serif;font-size:10px;font-weight:600;color:var(--muted);
   text-transform:lowercase;letter-spacing:.02em;margin-top:-1px}
-.timetable .corner{background:var(--surface-2);width:78px;padding:4px}
-.timetable .corner .cnav{display:flex;align-items:center;justify-content:center;gap:5px}
-.cnav-btn{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;padding:0;
+.timetable .corner{background:var(--surface-2);width:78px;padding:5px 4px}
+.timetable .corner .cnav{display:flex;flex-direction:column;align-items:center;gap:5px}
+.cnav-wk{font-family:"Baloo 2";font-size:12.5px;font-weight:700;color:var(--indigo);line-height:1}
+.cnav-row{display:flex;align-items:center;justify-content:center;gap:5px}
+.cnav-btn{display:inline-flex;align-items:center;justify-content:center;width:29px;height:29px;padding:0;
   border:1px solid var(--border);background:var(--surface);color:var(--fg);border-radius:9px;cursor:pointer;
   box-shadow:var(--shadow-sm);transition:.13s}
 .cnav-btn:hover{border-color:var(--indigo);color:var(--indigo);transform:translateY(-1px)}
-.cnav-btn svg{width:16px;height:16px}
+.cnav-btn svg{width:15px;height:15px}
 .timetable .timecell{background:var(--surface-2);font-weight:700;font-size:12px;color:var(--muted);
   text-align:center;padding:8px 4px;width:78px;white-space:nowrap;line-height:1.3}
 .timetable .timecell b{display:block;color:var(--fg);font-size:13px;font-family:"Baloo 2"}
-.timetable td.slot{padding:5px;height:82px}
+.timetable td.slot{padding:5px;height:104px}
 
-.lesson{position:relative;height:100%;min-height:70px;border-radius:11px;padding:8px 9px;border:1.5px solid transparent;
+.lesson{position:relative;height:100%;min-height:92px;border-radius:11px;padding:8px 9px;border:1.5px solid transparent;
   display:flex;flex-direction:column;gap:4px;cursor:pointer;transition:transform .14s,box-shadow .14s;overflow:hidden}
 .lesson:hover{transform:translateY(-2px);box-shadow:var(--shadow-md)}
 .lesson.pri{background:var(--pri-tint);border-color:var(--pri-bd)}
@@ -333,7 +327,7 @@ table.timetable{border-collapse:collapse;width:100%;min-width:760px}
 .legend .lg{display:inline-flex;align-items:center;gap:6px;font-weight:600}
 
 @media (max-width:640px){
-  .brand .t p{display:none}.tab span.tx{display:none}.tab{padding:0 13px}.weekpill .wlabel{min-width:120px}
+  .brand .t p{display:none}.tab span.tx{display:none}.tab{padding:0 13px}
 }
 @media print{
   header.topbar,.tabs,.top-actions,.cnav,.legend .no-print{display:none!important}
@@ -399,20 +393,7 @@ table.timetable{border-collapse:collapse;width:100%;min-width:760px}
 
   <!-- WEEK -->
   <section id="view-week">
-    <div class="weeknav">
-      <div class="weekpill">
-        <div class="wlabel"><b id="weekTitle">Settimana 1</b><span id="weekDates">—</span></div>
-        <select id="weekSelect" aria-label="Vai alla settimana"></select>
-      </div>
-      <span class="wn-meta" id="weekMeta"></span>
-      <div class="spacer"></div>
-      <button class="btn" onclick="window.print()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>Stampa</button>
-    </div>
-    <div class="legend">
-      <span class="lg"><span class="dot pri"></span>Primaria (arancio)</span>
-      <span class="lg"><span class="dot sec"></span>Secondaria (bordo blu)</span>
-      <span class="lg no-print" id="editHint" style="display:none;color:var(--indigo)">Modifica attiva — trascina le classi tra le celle oppure clicca per assegnare</span>
-    </div>
+    <div class="edit-hint no-print" id="editHint" style="display:none">Modifica orario attiva — trascina le classi tra le celle oppure clicca per assegnare</div>
     <div class="grid-card"><div class="grid-scroll"><table class="timetable" id="timetable"></table></div></div>
     <div class="weeknotes-card">
       <div class="wn-head">
@@ -686,31 +667,16 @@ function applyTheme(){
     : '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>';
 }
 
-/* ======================= WEEK NAV ======================= */
-function buildWeekSelect(){const sel=$("#weekSelect");sel.innerHTML="";
-  for(let i=0;i<WEEKS;i++){const o=document.createElement("option");o.value=i;o.textContent="Sett. "+(i+1)+" · "+fmtRange(i);sel.appendChild(o);}
-  sel.value=currentWeek;}
-function renderWeekHeader(){
-  $("#weekTitle").textContent="Settimana "+(currentWeek+1);
-  $("#weekDates").textContent=fmtRange(currentWeek);
-  $("#weekSelect").value=currentWeek;
-  const teachSlots=state.slots.filter(s=>isTeaching(cls(s.classId)));
-  const active=teachSlots.filter(s=>{const l=getLesson(currentWeek,s.id);return !(l&&l.suspended);});
-  const susp=teachSlots.length-active.length;
-  const total=active.length;
-  const planned=active.filter(s=>{const l=getLesson(currentWeek,s.id);return l&&l.appId;}).length;
-  const pct=total?Math.round(planned/total*100):0;
-  $("#weekMeta").textContent=planned+" / "+total+" lezioni pianificate · "+pct+"%"+(susp?" · "+susp+" sospes"+(susp===1?"a":"e"):"");
-}
-
 /* ======================= TIMETABLE ======================= */
 function renderTimetable(){
   const t=$("#timetable"),days=state.days,periods=state.periods;
   const mon=weekMonday(currentWeek);
   let html="<thead><tr><th class='corner'><div class='cnav'>"
+    +"<span class='cnav-wk'>Sett. "+(currentWeek+1)+"</span>"
+    +"<div class='cnav-row'>"
     +"<button class='cnav-btn' id='prevWeek' aria-label='Settimana precedente'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='m15 18-6-6 6-6'/></svg></button>"
     +"<button class='cnav-btn' id='nextWeek' aria-label='Settimana successiva'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='m9 18 6-6-6-6'/></svg></button>"
-    +"</div></th>";
+    +"</div></div></th>";
   for(let d=0;d<days;d++){
     const dt=new Date(mon);dt.setDate(mon.getDate()+d);
     html+="<th><div class='dh'><div class='dh-top'><span class='dh-name'>"+DAY_NAMES[d]+"</span><span class='dh-num'>"+dt.getDate()+"</span></div><span class='dh-mon'>"+MONTHS_FULL[dt.getMonth()]+"</span></div></th>";
@@ -808,7 +774,7 @@ function moveSlot(fromSid,day,period){
 $("#editToggle").onclick=()=>{editMode=!editMode;
   $("#editToggleLabel").textContent=editMode?"Fine modifica":"Modifica orario";
   $("#editToggle").classList.toggle("primary",editMode);
-  $("#editHint").style.display=editMode?"inline":"none";renderTimetable();};
+  $("#editHint").style.display=editMode?"block":"none";renderTimetable();};
 
 /* ============ AZIONI RAPIDE SULLA CARD (nota / sospensione) ============ */
 function blankLesson(){return {appId:null,appName:"",notes:"",done:false,suspended:false};}
@@ -1019,14 +985,13 @@ function renderWeekNotes(){
   ta.value=state.weekNotes[currentWeek]||"";
   $("#wnWeek").textContent="Settimana "+(currentWeek+1);
 }
-function renderWeek(){buildWeekSelect();renderWeekHeader();renderTimetable();renderWeekNotes();}
+function renderWeek(){renderTimetable();renderWeekNotes();}
 function switchView(v){activeView=v;
   document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.view===v));
   ["week","classes","topics","progress"].forEach(x=>$("#view-"+x).classList.toggle("hidden",x!==v));
   $("#editToggle").style.display=v==="week"?"":"none";
   if(v==="week")renderWeek();if(v==="classes")renderClasses();if(v==="topics")renderTopics("");if(v==="progress")renderProgress();}
 document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>switchView(t.dataset.view));
-$("#weekSelect").onchange=e=>{currentWeek=+e.target.value;renderWeek();};
 $("#weekNotes").oninput=e=>{state.weekNotes=state.weekNotes||{};const v=e.target.value;if(v.trim())state.weekNotes[currentWeek]=v;else delete state.weekNotes[currentWeek];scheduleSave();};
 $("#themeBtn").onclick=()=>{meta.theme=meta.theme==="dark"?"light":"dark";saveMeta();state.theme=meta.theme;applyTheme();scheduleSave();};
 
