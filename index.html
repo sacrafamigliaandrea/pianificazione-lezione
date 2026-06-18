@@ -473,6 +473,11 @@ table.timetable{border-collapse:collapse;width:100%;min-width:760px}
         <input id="setSyncUrl" type="url" placeholder="URL Apps Script …/exec" />
         <div class="hint">Vuoto = solo questo dispositivo (cifrato in locale). Configurazione in <b>Code.gs</b>.</div>
       </div>
+      <div class="field" style="border-top:1px solid var(--border);padding-top:14px"><label>Accesso esclusivo (uso personale)</label>
+        <button class="btn sm" id="genGateBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Genera codice accesso esclusivo</button>
+        <div class="hint">Crea una riga da incollare in <b>index.html</b> (variabile <code>OWNER_GATE</code>): dopo la pubblicazione la pagina chiederà sempre la <b>tua</b> password e nessuno potrà registrarne una propria. Usa una password robusta.</div>
+        <textarea id="gateOut" class="hidden" readonly rows="3" style="width:100%;margin-top:8px;font-family:ui-monospace,Menlo,monospace;font-size:11px;border:1px solid var(--border);background:var(--surface-2);color:var(--fg);border-radius:9px;padding:8px;resize:vertical"></textarea>
+      </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:14px">
         <button class="btn sm" id="exportBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg>Esporta (cifrato)</button>
         <button class="btn sm" id="importBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/></svg>Importa file</button>
@@ -497,6 +502,18 @@ const META_KEY = "acerio-meta";      // {syncUrl, theme} plaintext
 const BLOB_KEY = "acerio-blob";      // {v,salt,iter,ct} envelope, AES-256-GCM
 const PBKDF2_ITER = 210000;
 
+/* === ACCESSO ESCLUSIVO (uso personale del proprietario) ====================
+   Lascia null per consentire la creazione della password (primo uso).
+   Per rendere la pagina ad accesso esclusivo (nessuno può registrarsi):
+     1) apri l'app e crea/sblocca con la TUA password;
+     2) menu ⋮ ▸ Impostazioni ▸ "Genera codice accesso esclusivo", copia la riga;
+     3) incolla qui sotto al posto di null e ripubblica il file.
+   Quando è impostato, la pagina chiede SEMPRE la tua password e NON mostra mai
+   la schermata "Crea password". Il codice è innocuo da pubblicare: senza la
+   password non apre nulla (serve solo a verificare che sia la tua).            */
+const OWNER_GATE = null;
+const GATE_MARKER = "ACERIO-OWNER";
+
 /* ======================= CRYPTO (AES-256-GCM) ======================= */
 const enc = new TextEncoder(), dec = new TextDecoder();
 function b64(buf){let s="";const b=new Uint8Array(buf);for(let i=0;i<b.length;i++)s+=String.fromCharCode(b[i]);return btoa(s);}
@@ -518,6 +535,20 @@ async function decryptEnvelope(envStr){
   const raw = unb64(env.ct); const iv = raw.slice(0,12); const data = raw.slice(12);
   const pt = await crypto.subtle.decrypt({name:"AES-GCM", iv}, cryptoKey, data);
   return JSON.parse(dec.decode(pt));
+}
+// Gate del proprietario: cifra/verifica un marker noto con la chiave dell'utente
+async function makeOwnerGate(){
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({name:"AES-GCM", iv}, cryptoKey, enc.encode(GATE_MARKER));
+  const out = new Uint8Array(12 + ct.byteLength); out.set(iv,0); out.set(new Uint8Array(ct),12);
+  return {salt:b64(cryptoSalt), check:b64(out)};
+}
+async function verifyOwnerGate(key){
+  try{
+    const raw = unb64(OWNER_GATE.check); const iv = raw.slice(0,12); const data = raw.slice(12);
+    const pt = await crypto.subtle.decrypt({name:"AES-GCM", iv}, key, data);
+    return dec.decode(pt) === GATE_MARKER;
+  }catch(e){ return false; }
 }
 let cryptoKey = null, cryptoSalt = null;
 
@@ -897,6 +928,14 @@ $("#setSave").onclick=async()=>{
   meta.syncUrl=newUrl;saveMeta();setSync(newUrl?"ok":"local");
   scheduleSave();closeOverlay("#setOverlay");updateSub();renderWeek();toast("Impostazioni salvate");
 };
+$("#genGateBtn").onclick=async()=>{
+  if(!cryptoKey){toast("Sblocca prima con la tua password");return;}
+  const g=await makeOwnerGate();
+  const line="const OWNER_GATE = "+JSON.stringify(g)+";";
+  const ta=$("#gateOut");ta.classList.remove("hidden");ta.value=line;ta.focus();ta.select();
+  try{await navigator.clipboard.writeText(line);toast("Codice copiato — incollalo in index.html");}
+  catch(e){toast("Codice generato — selezionalo e copialo");}
+};
 $("#exportBtn").onclick=()=>{const env=localStorage.getItem(BLOB_KEY)||"";const blob=new Blob([env],{type:"application/json"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="acerio-planning-cifrato-"+new Date().toISOString().slice(0,10)+".json";a.click();toast("Backup cifrato esportato");};
 $("#importBtn").onclick=()=>$("#importFile").click();
@@ -913,7 +952,12 @@ function bootLock(){
   applyTheme();
   const hasBlob = !!localStorage.getItem(BLOB_KEY);
   $("#lockSyncUrl").value = meta.syncUrl||"";
-  if(hasBlob || meta.syncUrl){
+  if(OWNER_GATE){
+    lockMode="unlock";
+    $("#lockTitle").textContent="Planning protetto";
+    $("#lockDesc").textContent="Accesso riservato al proprietario. Inserisci la tua password.";
+    $("#lockBtn").textContent="Sblocca"; $("#lockPwd2").classList.add("hidden");
+  } else if(hasBlob || meta.syncUrl){
     lockMode="unlock";
     $("#lockTitle").textContent="Planning protetto";
     $("#lockDesc").textContent="Inserisci la password per decifrare i tuoi dati.";
@@ -946,6 +990,20 @@ $("#lockForm").addEventListener("submit", async e=>{
       let env=null;
       if(meta.syncUrl){ try{ setSync("busy"); env=await remoteLoad(); }catch(_){ env=null; } }
       if(!env) env=localStorage.getItem(BLOB_KEY);
+      // ACCESSO ESCLUSIVO: verifica la password contro il gate del proprietario
+      if(OWNER_GATE){
+        cryptoSalt=unb64(OWNER_GATE.salt);
+        cryptoKey=await deriveKey(pwd,cryptoSalt);
+        if(!(await verifyOwnerGate(cryptoKey))){
+          err.textContent="Password errata.";cryptoKey=null;cryptoSalt=null;return;
+        }
+        if(env){
+          state=Object.assign(defaultState(), await decryptEnvelope(env));
+          localStorage.setItem(BLOB_KEY,env);
+          if(state.theme){meta.theme=state.theme;saveMeta();}
+        } else { state=defaultState();state.theme=meta.theme;await persist(); }
+        enterApp();return;
+      }
       if(!env){ // nothing remote and nothing local -> treat as setup
         cryptoSalt=crypto.getRandomValues(new Uint8Array(16));cryptoKey=await deriveKey(pwd,cryptoSalt);
         state=defaultState();state.theme=meta.theme;await persist();enterApp();return;
